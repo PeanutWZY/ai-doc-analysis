@@ -1,0 +1,171 @@
+type Primitive = string | number | boolean | null | undefined
+
+// Record<K, T> 是一个实用工具类型，用于创建具有特定键类型和值类型的对象类型。它是构建类型安全字典、映射和配置对象的强大工具。
+// 它接受两个类型参数：K 是键的类型，T 是值的类型。
+// Record<K, T> 表示一个对象，其中每个键都是 K 类型，对应的值都是 T 类型。
+// 这使得我们可以在编译时确保对象的键值对符合预期的类型，从而提高代码的类型安全性。
+
+// 请求参数类型
+export type RequestParams = Record<string, Primitive | Primitive[]>
+
+// 请求配置类型
+export type RequestConfig = {
+  baseURL?: string
+  headers?: HeadersInit
+  timeout?: number
+  credentials?: RequestCredentials
+  cache?: RequestCache
+  redirect?: RequestRedirect
+  mode?: RequestMode
+  signal?: AbortSignal
+}
+
+// 请求选项类型
+export type RequestOptions = RequestConfig & {
+  params?: RequestParams
+  method?: string
+  body?: unknown
+}
+
+// HTTP 错误类型
+export type HttpError = {
+  name: string
+  status: number
+  message: string
+  data?: unknown
+}
+
+
+// 默认基础 URL
+const defaultBaseURL = process.env.NEXT_PUBLIC_API_BASE_URL ?? ""
+
+function toSearchParams(params?: RequestParams): string {
+  if (!params) return ""
+  const usp = new URLSearchParams()
+  Object.entries(params).forEach(([key, value]) => {
+    if (value === undefined || value === null) return
+    if (Array.isArray(value)) {
+      value.forEach(v => {
+        if (v === undefined || v === null) return
+        usp.append(key, String(v))
+      })
+    } else {
+      usp.set(key, String(value))
+    }
+  })
+  const s = usp.toString()
+  return s ? `?${s}` : ""
+}
+
+function buildURL(path: string, baseURL?: string, params?: RequestParams): string {
+  const prefix = (baseURL ?? defaultBaseURL) || ""
+  const url = prefix && !/^https?:\/\//i.test(path) && !path.startsWith("/")
+    ? `${prefix.replace(/\/+$/, "")}/${path.replace(/^\/+/, "")}`
+    : `${prefix}${path}`
+  return `${url}${toSearchParams(params)}`
+}
+
+function withTimeout(timeout?: number, externalSignal?: AbortSignal): AbortSignal | undefined {
+  if (!timeout && !externalSignal) return externalSignal
+  const controller = new AbortController()
+  const signals: AbortSignal[] = []
+  if (externalSignal) signals.push(externalSignal)
+  signals.forEach(s => {
+    s.addEventListener("abort", () => controller.abort())
+  })
+  if (timeout && timeout > 0) {
+    setTimeout(() => controller.abort(), timeout)
+  }
+  return controller.signal
+}
+
+async function parseBody(res: Response): Promise<unknown> {
+  const ct = res.headers.get("content-type") || ""
+  if (ct.includes("application/json")) return res.json()
+  if (ct.includes("text/")) return res.text()
+  const blob = await res.blob()
+  return blob
+}
+
+export async function request<T = unknown>(path: string, options: RequestOptions = {}): Promise<T> {
+  const {
+    baseURL,
+    headers,
+    timeout,
+    credentials,
+    cache,
+    redirect,
+    mode,
+    signal,
+    params,
+    method = "GET",
+    body,
+  } = options
+
+  const url = buildURL(path, baseURL, params)
+
+  const finalHeaders: HeadersInit = {
+    Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
+    ...headers,
+  }
+
+  let payload: BodyInit | undefined
+  if (body !== undefined && method !== "GET") {
+    if (typeof body === "string" || body instanceof FormData || body instanceof Blob) {
+      payload = body as BodyInit
+    } else {
+      if (!("Content-Type" in (finalHeaders as Record<string, string>))) {
+        (finalHeaders as Record<string, string>)["Content-Type"] = "application/json"
+      }
+      payload = JSON.stringify(body)
+    }
+  }
+
+  const fetchOptions: RequestInit = {
+    method,
+    headers: finalHeaders,
+    body: payload,
+    credentials,
+    cache,
+    redirect,
+    mode,
+    signal: withTimeout(timeout, signal),
+  }
+
+  const res = await fetch(url, fetchOptions)
+  const data = await parseBody(res)
+
+  if (!res.ok) {
+    const err: HttpError = {
+      name: "HTTPError",
+      status: res.status,
+      message: typeof data === "string" ? data : (data && (data as Record<string, unknown>).message as string) ?? res.statusText,
+      data,
+    }
+    throw err
+  }
+  return data as T
+}
+
+export function get<T = unknown>(path: string, config: RequestConfig & { params?: RequestParams } = {}) {
+  return request<T>(path, { ...config, method: "GET" })
+}
+
+export function post<T = unknown>(path: string, body?: unknown, config: RequestConfig & { params?: RequestParams } = {}) {
+  return request<T>(path, { ...config, method: "POST", body })
+}
+
+export function put<T = unknown>(path: string, body?: unknown, config: RequestConfig & { params?: RequestParams } = {}) {
+  return request<T>(path, { ...config, method: "PUT", body })
+}
+
+export function patch<T = unknown>(path: string, body?: unknown, config: RequestConfig & { params?: RequestParams } = {}) {
+  return request<T>(path, { ...config, method: "PATCH", body })
+}
+
+export function del<T = unknown>(path: string, config: RequestConfig & { params?: RequestParams } = {}) {
+  return request<T>(path, { ...config, method: "DELETE" })
+}
+
+export const http = { request, get, post, put, patch, del }
+
