@@ -4,30 +4,35 @@ import { http } from "@/lib/request"
 import Link from "next/link"
 import { Card, Form, Input, Button, Alert, Typography, message } from "antd"
 import { useState } from "react"
+import { useAppDispatch } from "@/store/hooks"
+import { login } from "@/store/slices/authSlice"
 
 type LoginResponse = {
   code: number
   message: string
   data?: {
     token: string
-    user: { id: number; name: string; email: string }
+    user: { id: number; username: string; email: string }
   }
 }
 
 export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
-  const [token, setToken] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+  const dispatch = useAppDispatch()
 
-  async function onFinish(values: { email: string; password: string }) {
+  async function onFinish(values: { name: string; password: string }) {
     setError(null)
-    setToken(null)
     setLoading(true)
     try {
       const res = await http.post<LoginResponse>("/auth/login", values)
       if (res.code === 0 && res.data) {
-        setToken(res.data.token)
+        dispatch(login({ user: res.data.user, token: res.data.token }))
         message.success("登录成功")
+        // 登录成功后跳转到首页或之前的页面
+        const params = new URLSearchParams(window.location.search);
+        const returnUrl = params.get('returnUrl');
+        window.location.href = returnUrl ? decodeURIComponent(returnUrl) : '/'
       } else {
         setError(res.message || "登录失败")
       }
@@ -57,11 +62,11 @@ export default function LoginPage() {
         )}
         <Form layout="vertical" onFinish={onFinish}>
           <Form.Item
-            label="邮箱"
-            name="email"
-            rules={[{ required: true, message: "请输入邮箱" }, { type: "email", message: "邮箱格式不正确" }]}
+            label="用户名或者邮箱"
+            name="name"
+            rules={[{ required: true, message: "请输入用户名或者邮箱" }]}
           >
-            <Input placeholder="you@example.com" />
+            <Input placeholder="请输入用户名或者邮箱" />
           </Form.Item>
           <Form.Item label="密码" name="password" rules={[{ required: true, message: "请输入密码" }]}>
             <Input.Password placeholder="******" />

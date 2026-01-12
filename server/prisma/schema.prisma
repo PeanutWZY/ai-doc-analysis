@@ -1,0 +1,36 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          Int      @id @default(autoincrement())
+  username    String?  @unique @db.VarChar(20)
+  phonenumber String?  @default("") @db.VarChar(11)
+  email       String   @unique @db.VarChar(100)
+  password    String   @db.VarChar(255)
+  role        String   @default("user") @db.VarChar(20)
+  isBanned    Boolean  @default(false) @map("is_banned")
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  logs        UserModificationLog[]
+
+  @@index([username])
+  @@index([role])
+}
+
+model UserModificationLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @map("user_id")
+  user      User     @relation(fields: [userId], references: [id])
+  field     String   @db.VarChar(50) // 修改的字段名
+  oldValue  String?  @map("old_value") @db.Text // 修改前的值
+  newValue  String?  @map("new_value") @db.Text // 修改后的值
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@map("user_modification_logs")
+}

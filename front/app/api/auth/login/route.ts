@@ -10,7 +10,7 @@ export async function POST(req: Request) {
     token: "@guid",
     user: {
       id: "@integer(1, 99999)",
-      name: "@name",
+      username: "@name",
       email,
     },
   })

@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { AuthModule } from './auth/auth.module';
-import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { User } from './entities/user.entity';
+import { ConfigModule } from '@nestjs/config';
+import configuration from './config/configuration';
+import { PrismaModule } from './prisma/prisma.module';
+import { UserModule } from './user/user.module';
+import { APP_GUARD } from '@nestjs/core';
+import { JwtAuthGuard } from './auth/jwt-auth.guard';
 
 @Module({
   imports: [
@@ -12,25 +15,19 @@ import { User } from './entities/user.entity';
       isGlobal: true,
       envFilePath:
         process.env.NODE_ENV === 'production' ? '.env' : '.env.development',
+      load: [configuration],
     }),
-    TypeOrmModule.forRootAsync({
-      inject: [ConfigService],
-      useFactory: (config: ConfigService) => ({
-        type: 'postgres',
-        host: config.get<string>('POSTGRES_HOST', 'localhost'),
-        port: Number(config.get<string>('POSTGRES_PORT', '5432')),
-        username: config.get<string>('POSTGRES_USER', 'postgres'),
-        password: config.get<string>('POSTGRES_PASSWORD', ''),
-        database: config.get<string>('POSTGRES_DB', 'ai_doc_analysis'),
-        entities: [User],
-        synchronize: true,
-        ssl: config.get<string>('POSTGRES_SSL', 'false') === 'true',
-      }),
-    }),
-    TypeOrmModule.forFeature([User]),
+    PrismaModule,
     AuthModule,
+    UserModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [
+    AppService,
+    {
+      provide: APP_GUARD,
+      useClass: JwtAuthGuard,
+    },
+  ],
 })
 export class AppModule {}

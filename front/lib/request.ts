@@ -100,51 +100,65 @@ export async function request<T = unknown>(path: string, options: RequestOptions
     params,
     method = "GET",
     body,
+    ...rest
   } = options
 
-  const url = buildURL(path, baseURL, params)
-
-  const finalHeaders: HeadersInit = {
-    Accept: "application/json, text/plain;q=0.9, */*;q=0.8",
-    ...headers,
-  }
-
-  let payload: BodyInit | undefined
-  if (body !== undefined && method !== "GET") {
-    if (typeof body === "string" || body instanceof FormData || body instanceof Blob) {
-      payload = body as BodyInit
-    } else {
-      if (!("Content-Type" in (finalHeaders as Record<string, string>))) {
-        (finalHeaders as Record<string, string>)["Content-Type"] = "application/json"
-      }
-      payload = JSON.stringify(body)
+  // 添加 Authorization header
+  const authHeaders: Record<string, string> = {};
+  if (typeof window !== 'undefined') {
+    const token = localStorage.getItem('token');
+    if (token) {
+      authHeaders['Authorization'] = `Bearer ${token}`;
     }
   }
 
-  const fetchOptions: RequestInit = {
+  const url = buildURL(path, baseURL, params)
+  const reqSignal = withTimeout(timeout, signal)
+
+  const reqInit: RequestInit = {
     method,
-    headers: finalHeaders,
-    body: payload,
+    headers: {
+      "Content-Type": "application/json",
+      ...authHeaders,
+      ...(headers as Record<string, string>),
+    },
     credentials,
     cache,
     redirect,
     mode,
-    signal: withTimeout(timeout, signal),
+    signal: reqSignal,
+    ...rest
   }
 
-  const res = await fetch(url, fetchOptions)
-  const data = await parseBody(res)
+  if (body) {
+    reqInit.body = JSON.stringify(body)
+  }
 
-  if (!res.ok) {
-    const err: HttpError = {
-      name: "HTTPError",
-      status: res.status,
-      message: typeof data === "string" ? data : (data && (data as Record<string, unknown>).message as string) ?? res.statusText,
-      data,
+  try {
+    const res = await fetch(url, reqInit)
+    const data = await parseBody(res)
+
+    if (!res.ok) {
+      // 处理 401 未授权
+      if (res.status === 401 && typeof window !== 'undefined') {
+        localStorage.removeItem('token');
+        window.location.href = '/login';
+      }
+      throw {
+        name: "HttpError",
+        status: res.status,
+        message: (data as any)?.message || res.statusText,
+        data
+      } as HttpError
+    }
+
+    return data as T
+  } catch (err: any) {
+    if (err.name === "AbortError") {
+      throw { name: "TimeoutError", status: 408, message: "Request Timeout" }
     }
     throw err
   }
-  return data as T
 }
 
 export function get<T = unknown>(path: string, config: RequestConfig & { params?: RequestParams } = {}) {

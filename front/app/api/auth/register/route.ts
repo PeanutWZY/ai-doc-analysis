@@ -2,13 +2,17 @@ import Mock from "mockjs"
 
 export async function POST(req: Request) {
   const body = await req.json().catch(() => ({} as unknown))
-  const { email, password } = body as { email?: string; password?: string }
-  if (!email || !password) {
+  const { username, email, password } = body as {
+    username?: string
+    email?: string
+    password?: string
+  }
+  if (!username || !email || !password) {
     return Response.json({ code: 400, message: "缺少参数" }, { status: 400 })
   }
   const data = Mock.mock({
     id: "@integer(1, 99999)",
-    name: "@name",
+    username,
     email,
     createdAt: "@datetime",
   })
