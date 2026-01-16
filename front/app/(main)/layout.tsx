@@ -5,6 +5,7 @@ import { usePathname, useRouter } from "next/navigation"
 import { Avatar, Button, Dropdown, type MenuProps } from "antd"
 import { useMemo } from "react"
 import { useAppDispatch, useAppSelector } from "@/store/hooks"
+import { logout } from "@/store/slices/authSlice"
 
 type NavItem = { label: string; href: string }
 
@@ -94,13 +95,13 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
         label: "登出",
         danger: true,
         onClick: () => {
-          logout()
+          dispatch(logout());
           router.replace("/login")
           router.refresh()
         },
       },
     ]
-  }, [logout, router, user?.email, user?.username])
+  }, [dispatch, router, user?.email, user?.username])
 
   return (
     <div className="min-h-screen bg-white dark:bg-black">

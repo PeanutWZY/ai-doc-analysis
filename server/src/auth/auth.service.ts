@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { JwtService } from '@nestjs/jwt';
 import { AuthLoginDto, AuthRegisterDto } from './dto/auth.dto';
+import * as argon2 from 'argon2';
 
 type DbUser = {
   id: number;
@@ -33,8 +34,26 @@ export class AuthService {
         OR: [{ username: name }, { email: name }],
       },
     });
-    if (!found || found.password !== password) {
+    if (!found) {
       return { code: 401, message: '账号或密码错误' };
+    }
+
+    const stored = found.password;
+    const isHashed = typeof stored === 'string' && stored.startsWith('$argon2');
+    const isValid = isHashed
+      ? await argon2.verify(stored, password)
+      : stored === password;
+
+    if (!isValid) {
+      return { code: 401, message: '账号或密码错误' };
+    }
+
+    if (!isHashed) {
+      const hashed = await argon2.hash(password);
+      await this.prisma.user.update({
+        where: { id: found.id },
+        data: { password: hashed },
+      });
     }
 
     const payload = { username: found.username, sub: found.id };
@@ -68,8 +87,9 @@ export class AuthService {
     if (existsUsername) {
       return { code: 409, message: '用户名已存在' };
     }
+    const passwordHash = await argon2.hash(password);
     const created = (await this.prisma.user.create({
-      data: { email, password, username },
+      data: { email, password: passwordHash, username },
     })) as DbUser;
     const data: {
       id: number;

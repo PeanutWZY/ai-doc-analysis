@@ -48,18 +48,6 @@ export default function LoginPage() {
     <div className="flex min-h-screen items-center justify-center bg-zinc-50 dark:bg-black p-4">
       <Card title="登录" className="w-full max-w-md">
         {error && <Alert type="error" message={error} showIcon className="mb-4" />}
-        {token && (
-          <Alert
-            type="success"
-            message={
-              <Typography.Text>
-                登录成功，令牌：<span className="font-mono break-all">{token}</span>
-              </Typography.Text>
-            }
-            showIcon
-            className="mb-4"
-          />
-        )}
         <Form layout="vertical" onFinish={onFinish}>
           <Form.Item
             label="用户名或者邮箱"

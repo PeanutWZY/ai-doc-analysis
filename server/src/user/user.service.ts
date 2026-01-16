@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateUserDto } from './dto/user.dto';
+import * as argon2 from 'argon2';
 
 @Injectable()
 export class UserService {
@@ -17,8 +18,11 @@ export class UserService {
       return { code: 3001, message: '用户不存在' };
     }
 
-    const { username, password } = dto;
-    const updates: any = {};
+    const { username, oldPassword, newPassword } = dto;
+    const updates: {
+      username?: string;
+      password?: string;
+    } = {};
     const logs: any[] = [];
 
     if (username && username !== user.username) {
@@ -36,8 +40,30 @@ export class UserService {
       });
     }
 
-    if (password && password !== user.password) {
-      updates.password = password; // 注意：此处遵循现有系统存明文密码的模式
+    const passwordTouched = Boolean(oldPassword || newPassword);
+    if (passwordTouched) {
+      if (!oldPassword || !newPassword) {
+        return { code: 3003, message: '修改密码需同时提供原密码与新密码' };
+      }
+
+      const stored = user.password;
+      const isHashed =
+        typeof stored === 'string' && stored.startsWith('$argon2');
+      const oldValid = isHashed
+        ? await argon2.verify(stored, oldPassword)
+        : stored === oldPassword;
+      if (!oldValid) {
+        return { code: 3004, message: '原密码错误' };
+      }
+
+      const newIsSameAsOld = isHashed
+        ? await argon2.verify(stored, newPassword)
+        : stored === newPassword;
+      if (newIsSameAsOld) {
+        return { code: 3005, message: '新密码不能与旧密码相同' };
+      }
+
+      updates.password = await argon2.hash(newPassword);
       logs.push({
         userId,
         field: 'password',

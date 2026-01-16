@@ -3,11 +3,15 @@ import { PassportStrategy } from '@nestjs/passport';
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { PrismaService } from '../prisma/prisma.service';
+import type { User as PrismaUser } from '@prisma/client';
 
 type JwtPayload = {
   sub: number;
   username: string;
 };
+
+// 排除密码
+export type SafeUser = Omit<PrismaUser, 'password'>;
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -31,6 +35,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     }
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...result } = user;
-    return result;
+    return result as SafeUser;
   }
 }

@@ -56,7 +56,7 @@ export default function SettingsGeneralPage() {
       if (usernameChanged || passwordTouched) {
         const res = await http.post<ChangePasswordResponse>("/user/update", {
           username,
-          currentPassword,
+          oldPassword: currentPassword,
           newPassword,
         })
         if (res.code !== 0) {

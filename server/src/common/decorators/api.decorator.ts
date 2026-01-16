@@ -29,9 +29,9 @@ export interface ApiParamOption {
   /** 是否必填，默认 true */
   required?: boolean;
   /** 示例值 */
-  example?: any;
+  example?: unknown;
   /** 枚举值 */
-  enum?: any[];
+  enum?: unknown[];
 }
 
 /**
@@ -47,9 +47,9 @@ export interface ApiQueryOption {
   /** 是否必填，默认 false */
   required?: boolean;
   /** 示例值 */
-  example?: any;
+  example?: unknown;
   /** 枚举值 */
-  enum?: any[];
+  enum?: unknown[];
   /** 是否允许为空 */
   allowEmptyValue?: boolean;
 }
@@ -189,12 +189,12 @@ export interface ApiOptions {
   /**
    * 请求示例
    */
-  requestExample?: any;
+  requestExample?: unknown;
 
   /**
    * 响应示例
    */
-  responseExample?: any;
+  responseExample?: unknown;
 
   /**
    * 文件上传配置，设为 true 使用默认配置，或传入对象自定义
@@ -320,14 +320,12 @@ export const Api = (options: ApiOptions) => {
     [];
 
   // 1. ApiOperation - 接口基本信息
-  const operationOptions: any = {
+  const operationOptions = {
     summary,
     description,
     deprecated,
+    ...(operationId ? { operationId } : {}),
   };
-  if (operationId) {
-    operationOptions.operationId = operationId;
-  }
   decorators.push(ApiOperation(operationOptions));
 
   // 2. ApiTags - 方法级别额外标签
@@ -384,19 +382,21 @@ export const Api = (options: ApiOptions) => {
     );
   } else if (body) {
     // 4. ApiBody - 请求体（如有）
-    const bodyOptions: any = {
+    const bodyOptions = {
       type: body,
       required: true,
+      ...(requestExample
+        ? {
+            examples: {
+              default: {
+                summary: '请求示例',
+                value: requestExample,
+              },
+            },
+          }
+        : {}),
     };
-    if (requestExample) {
-      bodyOptions.examples = {
-        default: {
-          summary: '请求示例',
-          value: requestExample,
-        },
-      };
-    }
-    decorators.push(ApiBody(bodyOptions));
+    decorators.push(ApiBody(bodyOptions as any));
   }
 
   // 5. ApiConsumes - 请求 Content-Type（非文件上传时）
@@ -485,33 +485,35 @@ export const Api = (options: ApiOptions) => {
 
   // 13. ApiOkResponse - 成功响应（统一格式）
   const dataSchema = buildDataSchema(type, isArray, isPager);
-  const okResponseOptions: any = {
-    description: '操作成功',
-    schema: {
-      allOf: [
-        { $ref: getSchemaPath(Result) },
-        {
-          properties: {
-            data: dataSchema,
-          },
+  const okSchema: Record<string, unknown> = {
+    allOf: [
+      { $ref: getSchemaPath(Result) },
+      {
+        properties: {
+          data: dataSchema,
         },
-      ],
-    },
+      },
+    ],
   };
   if (responseExample) {
-    okResponseOptions.schema.example = {
+    okSchema.example = {
       code: 200,
       msg: '操作成功',
       data: responseExample,
     };
   }
-  decorators.push(ApiOkResponse(okResponseOptions));
+  decorators.push(
+    ApiOkResponse({
+      description: '操作成功',
+      schema: okSchema as any,
+    }),
+  );
 
   // 14. 自定义多状态码响应
   if (responses) {
     Object.entries(responses).forEach(([statusCode, respOption]) => {
       const status = parseInt(statusCode, 10);
-      const respSchema: any = {
+      const respSchema: Record<string, unknown> = {
         properties: {
           code: { type: 'number', example: status },
           msg: { type: 'string', example: respOption.description },
@@ -525,7 +527,8 @@ export const Api = (options: ApiOptions) => {
           ? { type: respOption.type.name.toLowerCase() }
           : { $ref: getSchemaPath(respOption.type) };
 
-        respSchema.properties.data = respOption.isArray
+        const properties = respSchema.properties as Record<string, unknown>;
+        properties.data = respOption.isArray
           ? { type: 'array', items: respItems }
           : respItems;
       }
@@ -534,7 +537,7 @@ export const Api = (options: ApiOptions) => {
         ApiResponse({
           status,
           description: respOption.description,
-          schema: respSchema,
+          schema: respSchema as any,
         }),
       );
     });

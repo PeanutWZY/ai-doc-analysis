@@ -176,7 +176,7 @@ export interface IPaginatedData<T> {
 /**
  * 分页响应接口
  */
-export interface IPaginatedResponse<T> extends IResponse<IPaginatedData<T>> {}
+export type IPaginatedResponse<T> = IResponse<IPaginatedData<T>>;
 
 /**
  * 获取响应码对应的默认消息

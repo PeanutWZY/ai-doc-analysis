@@ -2,11 +2,9 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { AppModule } from './../src/app.module';
-import { PrismaService } from './../src/prisma/prisma.service';
 
 describe('UserController (e2e)', () => {
   let app: INestApplication;
-  let prisma: PrismaService;
 
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -15,7 +13,6 @@ describe('UserController (e2e)', () => {
 
     app = moduleFixture.createNestApplication();
     await app.init();
-    prisma = app.get(PrismaService);
   });
 
   afterAll(async () => {
@@ -39,7 +36,12 @@ describe('UserController (e2e)', () => {
       .send({ name: email, password })
       .expect(201);
 
-    const token = loginRes.body.data.token;
+    const loginBody = loginRes.body as {
+      code: number;
+      message: string;
+      data: { token: string };
+    };
+    const token = loginBody.data.token;
     expect(token).toBeDefined();
 
     // 2. Get Profile
@@ -48,8 +50,13 @@ describe('UserController (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(profileRes.body.data.username).toBe(username);
-    expect(profileRes.body.data.email).toBe(email);
+    const profileBody = profileRes.body as {
+      code: number;
+      message: string;
+      data: { username: string; email: string };
+    };
+    expect(profileBody.data.username).toBe(username);
+    expect(profileBody.data.email).toBe(email);
 
     // 3. Update user without userId in body
     const newUsername = `new${unique}`;
@@ -61,7 +68,8 @@ describe('UserController (e2e)', () => {
       })
       .expect(201);
 
-    expect(updateRes.body.code).toBe(0);
+    const updateBody = updateRes.body as { code: number; message: string };
+    expect(updateBody.code).toBe(0);
 
     // 4. Verify logs without userId in query
     const logsRes = await request(app.getHttpServer())
@@ -69,8 +77,13 @@ describe('UserController (e2e)', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    expect(logsRes.body.code).toBe(0);
-    expect(logsRes.body.data).toHaveLength(1);
-    expect(logsRes.body.data[0].newValue).toBe(newUsername);
+    const logsBody = logsRes.body as {
+      code: number;
+      message: string;
+      data: Array<{ newValue: string | null }>;
+    };
+    expect(logsBody.code).toBe(0);
+    expect(logsBody.data).toHaveLength(1);
+    expect(logsBody.data[0].newValue).toBe(newUsername);
   });
 });

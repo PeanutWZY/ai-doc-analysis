@@ -1,6 +1,5 @@
-import { Test, TestingModule } from '@nestjs/testing';
-import { Result, SUCCESS_CODE } from './result';
-import { ResponseCode, IPaginatedData } from './response.interface';
+import { Result } from './result';
+import { ResponseCode } from './response.interface';
 
 describe('Result', () => {
   describe('ok', () => {
@@ -49,7 +48,11 @@ describe('Result', () => {
 
     it('should create failure response with data', () => {
       const errorData = { field: 'username' };
-      const result = Result.fail(ResponseCode.PARAM_INVALID, '参数错误', errorData);
+      const result = Result.fail(
+        ResponseCode.PARAM_INVALID,
+        '参数错误',
+        errorData,
+      );
 
       expect(result.data).toEqual(errorData);
     });
@@ -85,7 +88,11 @@ describe('Result', () => {
     });
 
     it('should return failure when condition is false', () => {
-      const result = Result.when(false, { id: 1 }, ResponseCode.OPERATION_FAILED);
+      const result = Result.when(
+        false,
+        { id: 1 },
+        ResponseCode.OPERATION_FAILED,
+      );
 
       expect(result.isSuccess()).toBe(false);
       expect(result.code).toBe(ResponseCode.OPERATION_FAILED);

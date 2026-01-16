@@ -3,12 +3,15 @@ import {
   ExecutionContext,
   SetMetadata,
 } from '@nestjs/common';
+import type { Request } from 'express';
 import { UserType } from '../../user/dto/user.dto';
+
+type RequestWithUser = Request & { user?: UserType };
 
 export const User = createParamDecorator(
   (data: string | undefined, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest<Request>();
-    const user = request.user as UserType;
+    const request = ctx.switchToHttp().getRequest<RequestWithUser>();
+    const user = request.user;
 
     // 如果指定了属性名，返回该属性（支持嵌套属性如 'username'）
     if (data) {
@@ -24,9 +27,9 @@ export const NotRequireAuth = () => SetMetadata('notRequireAuth', true);
 
 export const UserTool = createParamDecorator(
   (data: unknown, ctx: ExecutionContext) => {
-    const request = ctx.switchToHttp().getRequest<Request>();
+    const request = ctx.switchToHttp().getRequest<RequestWithUser>();
 
-    const username = request.user?.username as string;
+    const username = request.user?.username;
 
     const injectCreate = <T>(data: T): T => {
       const obj = data as any;

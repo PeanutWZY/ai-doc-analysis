@@ -2,9 +2,10 @@ import { Controller, Post, Body, Get, Query } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import { Api } from '../common/decorators/api.decorator';
 import { UserService } from './user.service';
-import { UpdateUserDto, UserType } from './dto/user.dto';
+import { UpdateUserDto } from './dto/user.dto';
 import { UserModificationLogVo, UserProfileVo } from './vo/user.vo';
 import { User } from '../common/decorators/user.decorator';
+import { SafeUser } from 'src/auth/jwt.strategy';
 
 @ApiTags('用户管理')
 @Controller('user')
@@ -17,8 +18,8 @@ export class UserController {
     type: UserProfileVo,
   })
   @Get('profile')
-  async getProfile(@User() user) {
-    return { code: 0, message: 'ok', data: user };
+  getProfile(@User() user) {
+    return { code: 0, message: 'ok', data: user as SafeUser };
   }
 
   @Api({
@@ -27,8 +28,9 @@ export class UserController {
     body: UpdateUserDto,
   })
   @Post('update')
-  async update(@Body() body: UpdateUserDto, @User() user) {
-    const userId = user?.id || body.id;
+  update(@Body() body: UpdateUserDto, @User() user) {
+    const safeUser = user as SafeUser;
+    const userId = safeUser?.id || body.id;
     if (!userId) {
       return { code: 400, message: '无法获取用户ID' };
     }
@@ -50,8 +52,9 @@ export class UserController {
     ],
   })
   @Get('logs')
-  async getLogs(@Query('userId') userId: number, @User() user) {
-    const targetId = user?.id || userId;
+  getLogs(@Query('userId') userId: number, @User() user) {
+    const safeUser = user as SafeUser;
+    const targetId = safeUser?.id || userId;
     if (!targetId) {
       return { code: 400, message: '无法获取用户ID' };
     }

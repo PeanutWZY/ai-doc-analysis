@@ -23,4 +23,4 @@ async function bootstrap() {
   const port = configService.get<number>('port');
   await app.listen(port ?? 3001);
 }
-bootstrap();
+void bootstrap();
